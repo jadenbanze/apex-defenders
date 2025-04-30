@@ -186,6 +186,13 @@ interface FlockingData {
     neighbors: Phaser.Physics.Arcade.Sprite[];
 }
 
+// Define type-specific speed multipliers for men
+const MEN_SPEED_MULTIPLIERS = {
+    [ManType.SUPER]: 0.9,    // Super men are slowest
+    [ManType.MEDIUM]: 1.0,   // Medium men are baseline
+    [ManType.SMALL]: 1.35    // Small men are 35% faster (increased from default)
+};
+
 // Special gorilla abilities
 enum GorillaAbility {
     GROUND_SLAM = 'groundSlam',
@@ -446,7 +453,15 @@ export class MainScene extends Phaser.Scene {
             if (man) {
                 man.setScale(scale);
                 man.setCollideWorldBounds(true);
-                man.setData('stats', { ...stats });
+                
+                // Apply type-specific speed multiplier
+                const adjustedStats = { ...stats };
+                if (type === ManType.SMALL) {
+                    // Enhance small men's mobility
+                    adjustedStats.speed *= MEN_SPEED_MULTIPLIERS[type];
+                }
+                
+                man.setData('stats', adjustedStats);
                 man.setData('type', type);
                 man.setData('nextAttackTime', this.time.now + Phaser.Math.Between(0, MAN_BASE_COOLDOWN));
                 man.setCircle(man.width / 2);
@@ -503,10 +518,18 @@ export class MainScene extends Phaser.Scene {
             if (man) {
                 man.setScale(scale);
                 man.setCollideWorldBounds(true);
-                man.setData('stats', { ...stats });
+                
+                // Apply type-specific speed multiplier
+                const adjustedStats = { ...stats };
+                if (type === ManType.SMALL) {
+                    // Enhance small men's mobility
+                    adjustedStats.speed *= MEN_SPEED_MULTIPLIERS[type];
+                }
+                
+                man.setData('stats', adjustedStats);
                 man.setData('type', type);
                 man.setData('nextAttackTime', this.time.now + Phaser.Math.Between(0, MAN_BASE_COOLDOWN));
-                man.setCircle(man.width / 2); // Adjust physics body if needed after scaling
+                man.setCircle(man.width / 2);
             }
         }
     }
@@ -653,6 +676,17 @@ export class MainScene extends Phaser.Scene {
         
         // Give men a critical hit chance against gorilla
         if (target === this.gorilla) {
+            const manType = target === this.gorilla ? null : target.getData('type') as ManType;
+            
+            // Small men get extra attack power
+            if (manType === ManType.SMALL) {
+                // Small men deal 20% extra damage to gorilla (increased from before)
+                amount *= 1.2;
+            } else if (manType === ManType.SUPER) {
+                // Super men deal 15% extra damage to gorilla
+                amount *= 1.15;
+            }
+            
             // 10% chance for critical hit (1.5x damage)
             if (Math.random() < 0.1) {
                 amount *= 1.5;
@@ -673,14 +707,6 @@ export class MainScene extends Phaser.Scene {
                     onComplete: () => critText.destroy()
                 });
             }
-            
-            // Small men have a dodge chance (less damage)
-            // Super men have more damage potential
-            const manType = target === this.gorilla ? null : target.getData('type') as ManType;
-            if (manType === ManType.SUPER) {
-                // Super men deal 15% extra damage to gorilla
-                amount *= 1.15;
-            }
         } else {
             // Men take reduced damage based on type
             const manType = target.getData('type') as ManType;
@@ -688,8 +714,8 @@ export class MainScene extends Phaser.Scene {
                 // Super men have 15% damage reduction
                 amount *= 0.85;
             } else if (manType === ManType.SMALL) {
-                // Small men have 10% dodge chance
-                if (Math.random() < 0.1) {
+                // Small men have 15% dodge chance (increased from 10%)
+                if (Math.random() < 0.15) {
                     // Dodge successful
                     amount = 0;
                     
@@ -1086,7 +1112,7 @@ export class MainScene extends Phaser.Scene {
         console.log(`Gorilla used ${abilityInfo.name}`);
     }
     
-    // Ground Slam ability implementation
+    // Ground Slam ability implementation - further reduced damage
     performGroundSlam(abilityInfo: GorillaAbilityInfo) {
         if (!this.gorilla || !this.menGroup) return;
         
@@ -1094,7 +1120,7 @@ export class MainScene extends Phaser.Scene {
         const circle = this.add.circle(
             this.gorilla.x, 
             this.gorilla.y, 
-            GORILLA_ATTACK_RANGE * 1.8, // Reduced from 2
+            GORILLA_ATTACK_RANGE * 1.8,
             0xff0000, 
             0.3
         );
@@ -1112,7 +1138,7 @@ export class MainScene extends Phaser.Scene {
         this.cameras.main.shake(300, 0.01);
         
         // Find men in a radius (reduced)
-        const slamRadius = GORILLA_ATTACK_RANGE * 1.8; // Reduced from 2
+        const slamRadius = GORILLA_ATTACK_RANGE * 1.8;
         let menInRange: Phaser.Physics.Arcade.Sprite[] = [];
         
         if (this.quadtree) {
@@ -1143,9 +1169,17 @@ export class MainScene extends Phaser.Scene {
         menInRange.forEach(man => {
             if (!man.active) return;
             
-            // Reduced damage for ground slam
-            const slamDamage = gorillaStats.damage * 1.25; // Reduced from 1.5
-            this.takeDamage(man, slamDamage);
+            // Further reduced damage for ground slam
+            const slamDamage = gorillaStats.damage * 1.15; // Reduced from 1.25
+            
+            // Small men can partially resist ground slam
+            const manType = man.getData('type') as ManType;
+            if (manType === ManType.SMALL) {
+                // Small men take less damage from ground slam
+                this.takeDamage(man, slamDamage * 0.85); // 15% less damage for small men
+            } else {
+                this.takeDamage(man, slamDamage);
+            }
             
             // Reduced knockback effect
             const pushDirection = new Phaser.Math.Vector2(
@@ -1153,12 +1187,18 @@ export class MainScene extends Phaser.Scene {
                 man.y - this.gorilla!.y
             ).normalize();
             
-            const pushForce = 250; // Reduced from 300
+            const pushForce = 250;
             const manBody = man.body as Phaser.Physics.Arcade.Body;
             if (manBody) {
                 manBody.setVelocity(pushDirection.x * pushForce, pushDirection.y * pushForce);
                 man.setData('isRecovering', true);
-                man.setData('recoveryEndTime', this.time.now + 400); // Reduced from 500
+                
+                // Small men recover faster from knockback
+                if (manType === ManType.SMALL) {
+                    man.setData('recoveryEndTime', this.time.now + 300); // Quicker recovery for small men
+                } else {
+                    man.setData('recoveryEndTime', this.time.now + 400);
+                }
             }
             
             menHit++;
@@ -1478,6 +1518,7 @@ export class MainScene extends Phaser.Scene {
             if (!man.active || !this.gorilla?.active) return true;
 
             const manStats = man.getData('stats') as CharacterStats;
+            const manType = man.getData('type') as ManType;
             const nextAttackTime = man.getData('nextAttackTime') as number;
             const manBody = man.body as Phaser.Physics.Arcade.Body;
             const gorillaBody = this.gorilla.body as Phaser.Physics.Arcade.Body;
@@ -1502,15 +1543,28 @@ export class MainScene extends Phaser.Scene {
             if (!isRecovering && !isStunned) {
                 // Attack AI (Check before moving)
                 if (time > nextAttackTime) {
+                    // Smaller attack range for small men but they attack faster
+                    let attackRange = MAN_ATTACK_RANGE;
+                    let cooldownMultiplier = 1.0;
+                    
+                    if (manType === ManType.SMALL) {
+                        // Small men attack 20% faster
+                        cooldownMultiplier = 0.8;
+                    }
+                    
                     const distanceToGorillaSq = Phaser.Math.Distance.Squared(manBody.center.x, manBody.center.y, gorillaBody.center.x, gorillaBody.center.y);
-                    if (distanceToGorillaSq < MAN_ATTACK_RANGE * MAN_ATTACK_RANGE) {
+                    if (distanceToGorillaSq < attackRange * attackRange) {
                         manBody.setVelocity(0, 0); // Stop moving to attack
                         this.takeDamage(this.gorilla, manStats.damage);
                         menAttackedThisFrame++;
                         
-                        const cooldown = MAN_BASE_COOLDOWN + Phaser.Math.Between(-MAN_COOLDOWN_VARIANCE, MAN_COOLDOWN_VARIANCE);
+                        const cooldown = (MAN_BASE_COOLDOWN * cooldownMultiplier) + 
+                                        Phaser.Math.Between(-MAN_COOLDOWN_VARIANCE, MAN_COOLDOWN_VARIANCE);
                         man.setData('nextAttackTime', time + Math.max(50, cooldown));
-                        man.setTint(0x0000ff);
+                        
+                        // Tint based on man type
+                        const tintColor = manType === ManType.SMALL ? 0x00ffff : 0x0000ff;
+                        man.setTint(tintColor);
                         this.time.delayedCall(50, () => {
                            if(man.active) man.clearTint();
                         });
@@ -1524,11 +1578,9 @@ export class MainScene extends Phaser.Scene {
                     if (flockData) {
                         this.applyFlockingBehavior(man, flockData.neighbors);
                     } else {
-                        // Fallback to standard movement
                         this.physics.moveToObject(man, this.gorilla, manStats.speed);
                     }
                 } else {
-                    // Fallback to standard movement if flocking is disabled
                     this.physics.moveToObject(man, this.gorilla, manStats.speed);
                 }
             } else if (isStunned) {

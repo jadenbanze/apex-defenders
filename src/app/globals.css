@@ -1,26 +1,137 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Light Mode Theme */
+  --background: #f8f9fc;
+  --foreground: #1a1a1a;
+  
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
+  
+  --primary: #8b5cf6; /* Vibrant purple in light mode */
+  --primary-foreground: #ffffff;
+  
+  --secondary: #e2e8f0;
+  --secondary-foreground: #334155;
+  
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  
+  --accent: #f1f5f9;
+  --accent-foreground: #334155;
+  
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  
+  --border: #cbd5e1;
+  --input: #e2e8f0;
+  --ring: #8b5cf6; /* Match primary color */
+
+  /* Custom Retro Colors (Same in both modes) */
+  --neon-purple: #b026ff;
+  --neon-blue: #26a0ff;
+  --neon-cyan: #26ffff;
+  --retro-red: #ff2626;
+  --retro-yellow: #ffce26;
+  --retro-green: #26ff3d;
+  
+  /* Radius */
+  --radius: 0.625rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  /* Dark Mode Theme */
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  
+  --card: #1a1a1a; /* Darker, more solid card background */
+  --card-foreground: #ffffff;
+  
+  --popover: #1a1a1a; /* Match card for consistency */
+  --popover-foreground: #ffffff;
+  
+  --primary: #a855f7; /* Vibrant purple for dark mode */
+  --primary-foreground: #ffffff;
+  
+  --secondary: #27272a;
+  --secondary-foreground: #e4e4e7;
+  
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  
+  --accent: #27272a;
+  --accent-foreground: #e4e4e7;
+  
+  --destructive: #ff4444;
+  --destructive-foreground: #ffffff;
+  
+  --border: #2e2e2e;
+  --input: #27272a;
+  --ring: #a855f7; /* Match primary color */
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Removed @layer base block as it might conflict or be redundant */
+
+/* Keep keyframes and custom classes */
+@keyframes neon-flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    text-shadow: 
+      0 0 2px #fff,
+      0 0 4px #fff,
+      0 0 8px #fff,
+      0 0 12px var(--neon-purple),
+      0 0 20px var(--neon-purple),
+      0 0 24px var(--neon-purple);
+  }
+  20%, 24%, 55% {
+    text-shadow: none;
+  }
+}
+@keyframes scanline {
+ 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); }
+}
+.scanlines::before {
+ content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.05) 50%); background-size: 100% 4px; z-index: 10; pointer-events: none; opacity: 0.15;
+}
+.retro-text {
+  font-family: var(--font-retro), monospace;
+}
+.neon-text {
+  animation: neon-flicker 2s infinite alternate;
+}
+
+/* Add cursor-pointer to all buttons by default */
+button {
+  cursor: pointer !important;
+}
+
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+/* Fix for number inputs to display properly */
+input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+/* Remove spinner buttons in Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }

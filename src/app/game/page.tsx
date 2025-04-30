@@ -36,6 +36,9 @@ export default function GamePage() {
   const [finalScore, setFinalScore] = useState<number | null>(null);
   const [scoreBreakdown, setScoreBreakdown] = useState<{[key: string]: number}>({});
   
+  // Strategy state
+  const [selectedStrategy, setSelectedStrategy] = useState<string>("random");
+  
   // Timer state
   const [battleTime, setBattleTime] = useState(0);
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
@@ -53,15 +56,64 @@ export default function GamePage() {
       fps: 0
   });
 
+  // Reference to store previous state for comparison
+  const prevGameStateRef = useRef<GameStateUpdate>({
+    gorillaHealth: GORILLA_STATS_ADJUSTED.maxHealth,
+    gorillaMaxHealth: GORILLA_STATS_ADJUSTED.maxHealth,
+    menLeft: 100,
+    fps: 0
+  });
+
   // Total men count (should always equal 100)
   const totalMen = useMemo(() => superMenCount + mediumMenCount + smallMenCount, [superMenCount, mediumMenCount, smallMenCount]);
 
-  // Memoize gameConfig to prevent unnecessary re-renders of PhaserGame
+  // Memoize the gorilla health percentage calculation to avoid recalculating on each render
+  const gorillaHealthPercent = useMemo(() => 
+    gameState.gorillaMaxHealth > 0 
+      ? (gameState.gorillaHealth / gameState.gorillaMaxHealth) * 100 
+      : 0, 
+    [gameState.gorillaHealth, gameState.gorillaMaxHealth]
+  );
+
+  // Define available strategies
+  const strategies = [
+    { 
+      id: "random", 
+      name: "Random Deployment", 
+      description: "Men are deployed randomly around the battlefield.",
+      bonus: "No special bonus",
+      icon: "⚔️" // Crossed swords
+    },
+    { 
+      id: "surround", 
+      name: "Surround Strategy", 
+      description: "Men encircle the gorilla from all directions.",
+      bonus: "Coordination bonus: Men attack more efficiently",
+      icon: "⭕" // Circle
+    },
+    { 
+      id: "flank", 
+      name: "Flanking Maneuver", 
+      description: "Men attack primarily from the sides.",
+      bonus: "Surprise advantage: Small men get speed boost",
+      icon: "↔️" // Left-right arrows
+    },
+    { 
+      id: "phalanx", 
+      name: "Phalanx Formation", 
+      description: "Stronger men in front with smaller men behind.",
+      bonus: "Defensive advantage: Super men get health boost",
+      icon: "🛡️" // Shield
+    },
+  ];
+
+  // Define memoized gameConfig to include selected strategy
   const gameConfig = useMemo<GameConfig>(() => ({
     superMenCount,
     mediumMenCount,
     smallMenCount,
-  }), [superMenCount, mediumMenCount, smallMenCount]);
+    strategy: selectedStrategy,
+  }), [superMenCount, mediumMenCount, smallMenCount, selectedStrategy]);
   
   // Create a ref for the game end handler to avoid stale closures
   const gameEndHandlerRef = useRef<(result: string) => void>(() => {});
@@ -94,9 +146,22 @@ export default function GamePage() {
     gameEndHandlerRef.current(result);
   }, []);
 
-   const handleStateUpdate = useCallback((newState: GameStateUpdate) => {
-        setGameState(newState);
-    }, []); // Empty dependency array as setter is stable
+  // Optimize state update handler to reduce unnecessary re-renders
+  const handleStateUpdate = useCallback((newState: GameStateUpdate) => {
+    // Only update if values have actually changed to prevent unnecessary re-renders
+    const prevState = prevGameStateRef.current;
+    
+    if (
+      newState.gorillaHealth !== prevState.gorillaHealth || 
+      newState.menLeft !== prevState.menLeft ||
+      newState.gorillaMaxHealth !== prevState.gorillaMaxHealth ||
+      // Only update FPS occasionally to reduce rendering
+      (Math.abs(newState.fps - prevState.fps) > 5) 
+    ) {
+      setGameState(newState);
+      prevGameStateRef.current = newState;
+    }
+  }, []);
 
   const resetGame = () => {
     setGameStarted(false);
@@ -154,11 +219,6 @@ export default function GamePage() {
     setter(100 - currentTotalWithoutThis);
   };
 
-  // Calculate health percentage and determine color class
-  const gorillaHealthPercent = gameState.gorillaMaxHealth > 0 
-    ? (gameState.gorillaHealth / gameState.gorillaMaxHealth) * 100 
-    : 0;
-  
   // Always use red for gorilla health bar
   const healthColor = '#ef4444'; // red-500 color
 
@@ -273,9 +333,9 @@ export default function GamePage() {
                 <div className="text-base sm:text-lg order-1">
                     MEN LEFT: <span className="text-cyan-500 dark:text-cyan-400 font-bold">{gameState.menLeft}</span>
                 </div>
-                 {/* FPS Counter */}
+                 {/* FPS Counter - Only show in development or optionally */}
                 <div className="text-xs sm:text-sm text-muted-foreground opacity-75 order-3 sm:order-2">
-                    FPS: {gameState.fps}
+                    FPS: {Math.round(gameState.fps)}
                 </div>
                 {/* Gorilla Health */} 
                 <div className="w-full sm:flex-1 px-0 sm:px-6 flex flex-col items-center order-2 sm:order-3">
@@ -285,7 +345,17 @@ export default function GamePage() {
                         className="h-3 sm:h-4 w-full bg-muted border border-border [&>div]:bg-red-500" 
                         style={{ '--health-color': healthColor } as React.CSSProperties} 
                     />
-                     <div className="text-[0.6rem] sm:text-xs text-muted-foreground mt-1">{Math.max(0, gameState.gorillaHealth)} / {gameState.gorillaMaxHealth}</div>
+                     <div className="text-[0.6rem] sm:text-xs text-muted-foreground mt-1">{Math.max(0, Math.round(gameState.gorillaHealth))} / {gameState.gorillaMaxHealth}</div>
+                </div>
+                {/* Strategy Indicator */}
+                <div className="w-full order-4 mt-1 flex items-center justify-center">
+                    <div className="bg-primary/10 border border-primary/30 rounded px-3 py-1 text-xs flex items-center">
+                        <span className="mr-2">{strategies.find(s => s.id === selectedStrategy)?.icon || '⚔️'}</span>
+                        <span className="text-primary font-semibold mr-1">STRATEGY:</span>
+                        <span className="text-primary">
+                            {strategies.find(s => s.id === selectedStrategy)?.name || 'Random Deployment'}
+                        </span>
+                    </div>
                 </div>
             </div>
         ) : !gameEnded ? (
@@ -319,6 +389,42 @@ export default function GamePage() {
                     </div>
                   </div>
                 ))}
+                
+                {/* Add strategy selection */}
+                <div className="px-3 sm:px-6 pb-4">
+                  <h3 className="text-base font-semibold text-primary mb-3">Battle Strategy</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {strategies.map((strategy) => (
+                      <div 
+                        key={strategy.id}
+                        onClick={() => setSelectedStrategy(strategy.id)}
+                        className={`
+                          p-3 rounded border cursor-pointer transition-all relative
+                          ${selectedStrategy === strategy.id 
+                            ? 'bg-primary/20 border-primary shadow-sm shadow-primary/30 ring-1 ring-primary/50' 
+                            : 'bg-background/40 border-border/50 hover:bg-background/60'
+                          }
+                        `}
+                      >
+                        {selectedStrategy === strategy.id && (
+                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-sm font-semibold">
+                            ACTIVE
+                          </div>
+                        )}
+                        <div className="flex items-center mb-1">
+                          <div className={`w-6 h-6 flex items-center justify-center rounded-full mr-2 ${
+                            selectedStrategy === strategy.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                          }`}>
+                            <span className="text-sm">{strategy.icon}</span>
+                          </div>
+                          <h4 className="font-bold text-sm">{strategy.name}</h4>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-1">{strategy.description}</p>
+                        <p className="text-xs text-primary italic">{strategy.bonus}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </CardContent>
               <CardFooter className="px-3 sm:px-6 pb-4 sm:pb-6">
                  {/* Use primary button style */} 
@@ -379,8 +485,17 @@ export default function GamePage() {
                           </div>
                         </div>
                         
-                        <div className="text-xs text-muted-foreground mt-2">
-                          Men Remaining: {gameState.menLeft}/100
+                        <div className="bg-background/50 p-3 rounded text-left text-sm space-y-2">
+                          <div className="flex items-center">
+                            <span className="text-primary font-semibold">Strategy:</span>
+                            <div className="ml-2 px-2 py-0.5 bg-primary/20 rounded-sm text-primary text-xs flex items-center">
+                              <span className="mr-1">{strategies.find(s => s.id === selectedStrategy)?.icon || '⚔️'}</span>
+                              {strategies.find(s => s.id === selectedStrategy)?.name || 'Random Deployment'}
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Men Remaining: {gameState.menLeft}/100
+                          </div>
                         </div>
                       </div>
                     )}

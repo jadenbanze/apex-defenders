@@ -24,6 +24,15 @@ export interface GameConfig {
   superMenCount: number;
   mediumMenCount: number;
   smallMenCount: number;
+  strategy: string;
+}
+
+// Define available strategy types
+export enum StrategyType {
+  RANDOM = 'random',
+  SURROUND = 'surround',
+  FLANK = 'flank',
+  PHALANX = 'phalanx',
 }
 
 // Define stats for each type
